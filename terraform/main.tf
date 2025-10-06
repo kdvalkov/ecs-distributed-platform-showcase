@@ -534,6 +534,12 @@ module "ecs_service" {
   health_check_grace_period_seconds = 60
   enable_execute_command            = true
 
+  # Deployment circuit breaker
+  deployment_circuit_breaker = {
+    enable   = true
+    rollback = false
+  }
+
   # Autoscaling
   enable_autoscaling       = true
   autoscaling_min_capacity = var.ecs_min_capacity
