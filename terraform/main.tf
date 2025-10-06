@@ -289,6 +289,9 @@ module "rds" {
   password = random_password.db_password.result
   port     = 5432
 
+  # Use our own password management instead of AWS Secrets Manager
+  manage_master_user_password = false
+
   multi_az               = var.db_multi_az
   db_subnet_group_name   = module.vpc.database_subnet_group_name
   vpc_security_group_ids = [module.rds_sg.security_group_id]
