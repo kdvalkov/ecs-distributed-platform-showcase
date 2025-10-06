@@ -433,11 +433,12 @@ module "ecs_service" {
   # Container definitions
   container_definitions = {
     app = {
-      name      = "app"
-      image     = "${aws_ecr_repository.app.repository_url}:latest"
-      essential = true
+      name                     = "app"
+      image                    = "${aws_ecr_repository.app.repository_url}:latest"
+      essential                = true
+      readonly_root_filesystem = false
 
-      port_mappings = [
+      portMappings = [
         {
           name          = "app"
           containerPort = var.container_port
