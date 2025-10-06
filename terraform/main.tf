@@ -264,8 +264,8 @@ module "rds" {
 
   engine               = "postgres"
   engine_version       = var.db_engine_version
-  family               = "postgres15"
-  major_engine_version = "15"
+  family               = "postgres17"
+  major_engine_version = "17"
   instance_class       = var.db_instance_class
 
   allocated_storage     = var.db_allocated_storage
