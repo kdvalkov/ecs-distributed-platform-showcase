@@ -181,28 +181,9 @@ module "alb" {
   vpc_id  = module.vpc.vpc_id
   subnets = module.vpc.public_subnets
 
-  # Security group
-  security_group_ingress_rules = {
-    all_http = {
-      from_port   = 80
-      to_port     = 80
-      ip_protocol = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    }
-    all_https = {
-      from_port   = 443
-      to_port     = 443
-      ip_protocol = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    }
-  }
-
-  security_group_egress_rules = {
-    all = {
-      ip_protocol = "-1"
-      cidr_ipv4   = "0.0.0.0/0"
-    }
-  }
+  # Use existing security group instead of creating a new one
+  create_security_group = false
+  security_groups       = [module.alb_sg.security_group_id]
 
   listeners = {
     http = {
