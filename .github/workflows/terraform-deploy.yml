@@ -93,7 +93,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           echo "🔧 Initializing Terraform..."
-          terraform init -input=false
+          terraform init -input=false -upgrade
           echo "✅ Terraform initialized"
       
       - name: Terraform Validate
@@ -158,7 +158,7 @@ jobs:
       
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIR }}
-        run: terraform init -input=false
+        run: terraform init -input=false -upgrade
       
       - name: Download Plan
         uses: actions/download-artifact@v4
