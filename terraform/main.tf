@@ -347,6 +347,7 @@ module "autoscaling" {
 
   image_id      = jsondecode(data.aws_ssm_parameter.ecs_optimized_ami.value)["image_id"]
   instance_type = var.ecs_instance_type
+  key_name      = var.key_name != "" ? var.key_name : null
 
   security_groups = [module.ecs_sg.security_group_id]
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {

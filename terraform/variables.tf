@@ -94,9 +94,13 @@ variable "ecs_cluster_max_size" {
 
 # RDS Configuration
 variable "db_engine_version" {
-  description = "PostgreSQL engine version"
+  description = "PostgreSQL engine version (major version, AWS will use latest minor version)"
   type        = string
-  default     = "15.4"
+  default     = "17"
+  # PostgreSQL 17 is the latest major version available on AWS RDS (currently 17.6)
+  # Includes improved performance, better JSON support, and enhanced vacuum
+  # AWS automatically uses the latest minor version
+  # To use a different version: 16 (stable, 16.10) or 15 (conservative, 15.14)
 }
 
 variable "db_instance_class" {
@@ -175,6 +179,13 @@ variable "memory_target_value" {
   description = "Target memory utilization percentage for auto-scaling"
   type        = number
   default     = 80
+}
+
+# EC2 Configuration
+variable "key_name" {
+  description = "EC2 SSH key pair name (optional - SSM Session Manager is enabled)"
+  type        = string
+  default     = ""
 }
 
 # GitHub OIDC Configuration
