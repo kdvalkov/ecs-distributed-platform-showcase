@@ -19,8 +19,23 @@ if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
     users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
     challenge: true,
     realm: 'DevOps Showcase',
+    // Exclude health check endpoints from authentication
+    authorizer: (username, password, cb) => {
+      const userMatches = basicAuth.safeCompare(username, BASIC_AUTH_USER);
+      const passwordMatches = basicAuth.safeCompare(password, BASIC_AUTH_PASSWORD);
+      cb(null, userMatches && passwordMatches);
+    },
+    unauthorizedResponse: (req) => {
+      // Skip auth for health check endpoints
+      if (req.path === '/health' || req.path === '/ready') {
+        return null;
+      }
+      return req.auth
+        ? ('Credentials rejected')
+        : 'No credentials provided';
+    }
   }));
-  console.log('🔒 Basic authentication enabled');
+  console.log('🔒 Basic authentication enabled (health endpoints excluded)');
 }
 
 // PostgreSQL connection pool
