@@ -276,6 +276,14 @@ module "rds" {
   parameter_group_name            = null # Let the module generate the name automatically
   parameter_group_use_name_prefix = true
 
+  # Disable SSL requirement for dev environment
+  parameters = [
+    {
+      name  = "rds.force_ssl"
+      value = "0"
+    }
+  ]
+
   db_name  = var.db_name
   username = var.db_username
   password = random_password.db_password.result
@@ -517,23 +525,9 @@ module "ecs_service" {
   # Network configuration
   subnet_ids = module.vpc.private_subnets
 
-  security_group_ingress_rules = {
-    alb = {
-      from_port                    = var.container_port
-      to_port                      = var.container_port
-      ip_protocol                  = "tcp"
-      description                  = "Allow traffic from ALB"
-      referenced_security_group_id = module.alb_sg.security_group_id
-    }
-  }
-
-  security_group_egress_rules = {
-    all = {
-      ip_protocol = "-1"
-      cidr_ipv4   = "0.0.0.0/0"
-      description = "Allow all outbound"
-    }
-  }
+  # Use existing security group instead of creating a new one
+  create_security_group = false
+  security_group_ids    = [module.ecs_sg.security_group_id]
 
   # Service settings
   desired_count                     = var.ecs_desired_count
