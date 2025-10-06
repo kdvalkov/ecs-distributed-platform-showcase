@@ -179,10 +179,11 @@ variable "memory_target_value" {
 
 # GitHub OIDC Configuration
 variable "github_repo_name" {
-  description = "GitHub repository name in format 'repo:owner/repo-name:*' for OIDC trust"
+  description = "GitHub repository name in format 'organization/repository'"
   type        = string
-  default     = "repo:YOUR-GITHUB-USERNAME/devops_showcase:*"
-  # Example: "repo:johndoe/devops_showcase:*"
-  # The :* allows any branch to deploy
-  # For production, use: "repo:johndoe/devops_showcase:ref:refs/heads/main"
+  default     = "YOUR-GITHUB-USERNAME/devops_showcase"
+  # Example: "kdvalkov/ecs-distributed-platform-showcase"
+  # The module will automatically configure OIDC trust for this repository
+  # By default, all branches can deploy. To restrict to main branch only,
+  # modify the module configuration in github-oidc.tf
 }

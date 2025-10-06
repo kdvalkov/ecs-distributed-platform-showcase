@@ -16,9 +16,9 @@ db_name     = "showcase_db"
 
 # GitHub Repository for OIDC
 # IMPORTANT: Update this with your actual GitHub repository
-# Format: "repo:OWNER/REPOSITORY:*"
-# Example: "repo:johndoe/devops_showcase:*"
-github_repo_name = "repo:kdvalkov/ecs-distributed-platform-showcase:*"
+# Format: "OWNER/REPOSITORY"
+# Example: "kdvalkov/ecs-distributed-platform-showcase"
+github_repo_name = "kdvalkov/ecs-distributed-platform-showcase"
 
 # Instance Configuration (Free Tier Optimized)
 ecs_instance_type = "t3.small"
