@@ -20,6 +20,11 @@ db_name     = "showcase_db"
 # Example: "kdvalkov/ecs-distributed-platform-showcase"
 github_repo_name = "kdvalkov/ecs-distributed-platform-showcase"
 
+# Basic Authentication
+# Note: Username is defined here, password is stored in Parameter Store for security
+basic_auth_user = "devadmin"
+# Password is stored in: /devops-showcase-dev/auth/password (Parameter Store)
+
 # Instance Configuration (Free Tier Optimized)
 ecs_instance_type = "t3.small"
 db_instance_class = "db.t3.micro"

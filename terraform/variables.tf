@@ -188,6 +188,16 @@ variable "key_name" {
   default     = ""
 }
 
+# Basic Authentication Configuration
+variable "basic_auth_user" {
+  description = "Basic authentication username"
+  type        = string
+  default     = "admin"
+}
+
+# Note: basic_auth_password is stored in AWS Parameter Store
+# and will be set manually for security reasons
+
 # GitHub OIDC Configuration
 variable "github_repo_name" {
   description = "GitHub repository name in format 'organization/repository'"

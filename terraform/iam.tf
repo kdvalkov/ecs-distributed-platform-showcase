@@ -63,7 +63,8 @@ resource "aws_iam_role_policy" "ecs_task_execution_ecr" {
           aws_ssm_parameter.db_password.arn,
           aws_ssm_parameter.db_endpoint.arn,
           aws_ssm_parameter.db_name.arn,
-          aws_ssm_parameter.db_username.arn
+          aws_ssm_parameter.db_username.arn,
+          aws_ssm_parameter.auth_password.arn
         ]
       }
     ]

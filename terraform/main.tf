@@ -467,6 +467,10 @@ module "ecs_service" {
         {
           name  = "AWS_REGION"
           value = var.aws_region
+        },
+        {
+          name  = "BASIC_AUTH_USER"
+          value = var.basic_auth_user
         }
       ]
 
@@ -475,6 +479,10 @@ module "ecs_service" {
         {
           name      = "DB_PASSWORD"
           valueFrom = aws_ssm_parameter.db_password.arn
+        },
+        {
+          name      = "BASIC_AUTH_PASSWORD"
+          valueFrom = aws_ssm_parameter.auth_password.arn
         }
       ]
 

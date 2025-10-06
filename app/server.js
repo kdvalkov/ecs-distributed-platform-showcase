@@ -2,12 +2,26 @@ const express = require('express');
 const { Pool } = require('pg');
 const os = require('os');
 const fs = require('fs');
+const basicAuth = require('express-basic-auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Application start time for uptime calculation
 const startTime = Date.now();
+
+// Basic authentication middleware
+const BASIC_AUTH_USER = process.env.BASIC_AUTH_USER || 'admin';
+const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD || 'changeme';
+
+if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
+  app.use(basicAuth({
+    users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
+    challenge: true,
+    realm: 'DevOps Showcase',
+  }));
+  console.log('🔒 Basic authentication enabled');
+}
 
 // PostgreSQL connection pool
 const pool = new Pool({

@@ -66,3 +66,22 @@ resource "aws_ssm_parameter" "db_username" {
     }
   )
 }
+
+# Basic Auth Password (to be set manually)
+resource "aws_ssm_parameter" "auth_password" {
+  name        = "/${local.name_prefix}/auth/password"
+  description = "Basic authentication password for the application"
+  type        = "SecureString"
+  value       = "PLACEHOLDER" # This will be updated manually via AWS Console or CLI
+
+  lifecycle {
+    ignore_changes = [value] # Ignore changes to the value after initial creation
+  }
+
+  tags = merge(
+    local.tags,
+    {
+      Name = "${local.name_prefix}-auth-password"
+    }
+  )
+}
