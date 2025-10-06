@@ -11,7 +11,7 @@ on:
 
 env:
   AWS_REGION: eu-central-1
-  ECR_REPOSITORY: devops-showcase-app
+  ECR_REPOSITORY: devops-showcase-dev-app
   ECS_CLUSTER: devops-showcase-dev-cluster
   ECS_SERVICE: devops-showcase-dev-service
 
