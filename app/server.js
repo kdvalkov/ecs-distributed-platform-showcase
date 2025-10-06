@@ -10,12 +10,19 @@ const PORT = process.env.PORT || 3000;
 // Application start time for uptime calculation
 const startTime = Date.now();
 
-// Basic authentication middleware
+// Basic authentication configuration
 const BASIC_AUTH_USER = process.env.BASIC_AUTH_USER || 'admin';
 const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD || 'changeme';
 
-// Middleware to apply basic auth selectively (skip health endpoints)
-const conditionalBasicAuth = (req, res, next) => {
+// Create basic auth middleware instance
+const authMiddleware = basicAuth({
+  users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
+  challenge: true,
+  realm: 'DevOps Showcase',
+});
+
+// Apply auth conditionally - skip for health endpoints
+app.use((req, res, next) => {
   // Skip authentication for health check endpoints
   if (req.path === '/health' || req.path === '/ready') {
     return next();
@@ -23,18 +30,13 @@ const conditionalBasicAuth = (req, res, next) => {
   
   // Apply basic auth for all other endpoints
   if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
-    return basicAuth({
-      users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
-      challenge: true,
-      realm: 'DevOps Showcase',
-    })(req, res, next);
+    return authMiddleware(req, res, next);
   }
   
   next();
-};
+});
 
 if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
-  app.use(conditionalBasicAuth);
   console.log('🔒 Basic authentication enabled (health endpoints excluded)');
 }
 
