@@ -271,6 +271,10 @@ module "rds" {
   allocated_storage     = var.db_allocated_storage
   max_allocated_storage = var.db_allocated_storage * 2
 
+  # Force creation of new parameter group with correct family
+  create_db_parameter_group = true
+  parameter_group_name      = "${local.name_prefix}-postgres17"
+
   db_name  = var.db_name
   username = var.db_username
   password = random_password.db_password.result
