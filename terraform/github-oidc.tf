@@ -75,7 +75,7 @@ resource "aws_iam_policy" "github_actions" {
 
 module "github_oidc" {
   source  = "terraform-module/github-oidc-provider/aws"
-  version = "~> 1.0"
+  version = "~> 2.2"
 
   create_oidc_provider = true
   create_oidc_role     = true
@@ -83,7 +83,7 @@ module "github_oidc" {
   role_name        = "${local.name_prefix}-github-actions-role"
   role_description = "Role for GitHub Actions to deploy to AWS"
 
-  github_repositories = [var.github_repo_name]
+  repositories = [var.github_repo_name]
 
   # Attach the custom deployment policy
   oidc_role_attach_policies = [aws_iam_policy.github_actions.arn]
