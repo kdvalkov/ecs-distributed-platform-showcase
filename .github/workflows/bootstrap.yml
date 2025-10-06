@@ -134,7 +134,7 @@ jobs:
             --bucket ${{ github.event.inputs.bucket_name }} \
             --lifecycle-configuration '{
               "Rules": [{
-                "Id": "DeleteOldVersions",
+                "ID": "DeleteOldVersions",
                 "Status": "Enabled",
                 "NoncurrentVersionExpiration": {
                   "NoncurrentDays": 90
