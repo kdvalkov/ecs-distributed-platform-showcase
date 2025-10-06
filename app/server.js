@@ -14,27 +14,27 @@ const startTime = Date.now();
 const BASIC_AUTH_USER = process.env.BASIC_AUTH_USER || 'admin';
 const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD || 'changeme';
 
+// Middleware to apply basic auth selectively (skip health endpoints)
+const conditionalBasicAuth = (req, res, next) => {
+  // Skip authentication for health check endpoints
+  if (req.path === '/health' || req.path === '/ready') {
+    return next();
+  }
+  
+  // Apply basic auth for all other endpoints
+  if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
+    return basicAuth({
+      users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
+      challenge: true,
+      realm: 'DevOps Showcase',
+    })(req, res, next);
+  }
+  
+  next();
+};
+
 if (BASIC_AUTH_USER && BASIC_AUTH_PASSWORD) {
-  app.use(basicAuth({
-    users: { [BASIC_AUTH_USER]: BASIC_AUTH_PASSWORD },
-    challenge: true,
-    realm: 'DevOps Showcase',
-    // Exclude health check endpoints from authentication
-    authorizer: (username, password, cb) => {
-      const userMatches = basicAuth.safeCompare(username, BASIC_AUTH_USER);
-      const passwordMatches = basicAuth.safeCompare(password, BASIC_AUTH_PASSWORD);
-      cb(null, userMatches && passwordMatches);
-    },
-    unauthorizedResponse: (req) => {
-      // Skip auth for health check endpoints
-      if (req.path === '/health' || req.path === '/ready') {
-        return null;
-      }
-      return req.auth
-        ? ('Credentials rejected')
-        : 'No credentials provided';
-    }
-  }));
+  app.use(conditionalBasicAuth);
   console.log('🔒 Basic authentication enabled (health endpoints excluded)');
 }
 
