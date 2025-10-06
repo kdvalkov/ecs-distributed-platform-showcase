@@ -1,0 +1,172 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm (will delete ALL resources including database)'
+        required: true
+        type: string
+        default: ''
+      
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'dev'
+
+env:
+  TF_VERSION: '1.12.2'
+  AWS_REGION: 'eu-central-1'
+  WORKING_DIR: './terraform'
+
+jobs:
+  validate-destroy:
+    name: Validate Destroy Confirmation
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    
+    steps:
+      - name: Validate Destroy Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ ERROR: Destroy operation requires confirmation"
+            echo "Please type 'DESTROY' (all caps) in the confirm_destroy field"
+            exit 1
+          fi
+          echo "✅ Destroy confirmation validated"
+      
+      - name: Set Proceed Flag
+        id: check
+        run: echo "proceed=true" >> $GITHUB_OUTPUT
+
+  terraform-destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    needs: validate-destroy
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Verify AWS Connection
+        run: |
+          echo "🔍 Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials verified"
+      
+      - name: Select Environment Configuration
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "✅ Using configuration: environments/${{ github.event.inputs.environment }}.tfvars"
+          echo "📋 Environment configuration:"
+          cat environments/${{ github.event.inputs.environment }}.tfvars
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init -input=false
+      
+      - name: Terraform Plan Destroy
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "📋 Creating destroy plan for ${{ github.event.inputs.environment }} environment..."
+          terraform plan -var-file="environments/${{ github.event.inputs.environment }}.tfvars" -destroy -out=tfplan -input=false
+          echo ""
+          echo "Review of resources to be destroyed:"
+          terraform show tfplan
+      
+      - name: Final Destroy Warning
+        run: |
+          echo "⚠️  ═══════════════════════════════════════════════════════════"
+          echo "⚠️  WARNING: DESTRUCTIVE OPERATION IN PROGRESS"
+          echo "⚠️  ═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "The following resources will be DESTROYED:"
+          echo "  • VPC and all networking resources"
+          echo "  • Application Load Balancer"
+          echo "  • ECS Cluster and Services"
+          echo "  • RDS Database (including all data)"
+          echo "  • ECR Repository (including all images)"
+          echo "  • Security Groups"
+          echo "  • IAM Roles and Policies"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          echo "⚠️  This operation is IRREVERSIBLE!"
+          echo ""
+          echo "Proceeding in 10 seconds..."
+          sleep 10
+      
+      - name: Terraform Destroy
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "💣 Destroying infrastructure..."
+          terraform apply -destroy -input=false tfplan
+          echo "✅ Infrastructure destroyed successfully"
+      
+      - name: Cleanup ECR Images
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning up ECR images..."
+          REPO_NAME="devops-showcase-${{ github.event.inputs.environment }}"
+          
+          # Check if repository exists
+          if aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            # List and delete all images
+            aws ecr list-images \
+              --repository-name $REPO_NAME \
+              --region ${{ env.AWS_REGION }} \
+              --query 'imageIds[*]' \
+              --output json | \
+            jq -r '.[] | .imageDigest' | \
+            while read digest; do
+              aws ecr batch-delete-image \
+                --repository-name $REPO_NAME \
+                --region ${{ env.AWS_REGION }} \
+                --image-ids imageDigest=$digest || true
+            done
+            
+            echo "✅ ECR cleanup completed"
+          else
+            echo "ℹ️  ECR repository not found or already deleted"
+          fi
+      
+      - name: Destruction Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              Infrastructure Destroyed 💥                   ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          echo "✅ All resources have been destroyed"
+          echo "✅ ECR images cleaned up"
+          echo ""
+          echo "The infrastructure has been completely removed."
+          echo ""
+          echo "📋 Optional Next Steps:"
+          echo "   • Delete S3 state bucket if no longer needed"
+          echo "   • Review AWS Console to confirm all resources are gone"
+          echo "   • Check for any remaining resources that may incur charges"
+          echo ""

@@ -1,0 +1,231 @@
+name: Bootstrap S3 Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket_name:
+        description: 'S3 Bucket Name for Terraform State'
+        required: true
+        type: string
+        default: 'devops-showcase-terraform-state'
+      
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: choice
+        options:
+          - eu-central-1
+          - us-east-1
+          - eu-west-1
+        default: 'eu-central-1'
+      
+      confirm:
+        description: 'Type "create" to confirm S3 bucket creation'
+        required: true
+        type: string
+        default: ''
+
+env:
+  AWS_REGION: ${{ github.event.inputs.aws_region }}
+
+jobs:
+  validate:
+    name: Validate Inputs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "create" ]; then
+            echo "❌ ERROR: Bucket creation requires confirmation"
+            echo "Please type 'create' in the confirm field"
+            exit 1
+          fi
+          echo "✅ Confirmation validated"
+
+  bootstrap:
+    name: Create S3 Backend
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Verify AWS Connection
+        run: |
+          echo "🔍 Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials verified"
+      
+      - name: Check if Bucket Exists
+        id: check-bucket
+        continue-on-error: true
+        run: |
+          if aws s3api head-bucket --bucket ${{ github.event.inputs.bucket_name }} 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️  Bucket already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Bucket does not exist, proceeding with creation"
+          fi
+      
+      - name: Create S3 Bucket
+        if: steps.check-bucket.outputs.exists != 'true'
+        run: |
+          echo "🪣 Creating S3 bucket: ${{ github.event.inputs.bucket_name }}"
+          
+          # Create bucket
+          if [ "${{ env.AWS_REGION }}" == "eu-central-1" ]; then
+            aws s3api create-bucket \
+              --bucket ${{ github.event.inputs.bucket_name }} \
+              --region ${{ env.AWS_REGION }}
+          else
+            aws s3api create-bucket \
+              --bucket ${{ github.event.inputs.bucket_name }} \
+              --region ${{ env.AWS_REGION }} \
+              --create-bucket-configuration LocationConstraint=${{ env.AWS_REGION }}
+          fi
+          
+          echo "✅ S3 bucket created"
+      
+      - name: Enable Versioning
+        run: |
+          echo "🔄 Enabling versioning..."
+          aws s3api put-bucket-versioning \
+            --bucket ${{ github.event.inputs.bucket_name }} \
+            --versioning-configuration Status=Enabled
+          echo "✅ Versioning enabled"
+      
+      - name: Enable Encryption
+        run: |
+          echo "🔐 Enabling encryption..."
+          aws s3api put-bucket-encryption \
+            --bucket ${{ github.event.inputs.bucket_name }} \
+            --server-side-encryption-configuration '{
+              "Rules": [{
+                "ApplyServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                },
+                "BucketKeyEnabled": true
+              }]
+            }'
+          echo "✅ Encryption enabled"
+      
+      - name: Block Public Access
+        run: |
+          echo "🔒 Blocking public access..."
+          aws s3api put-public-access-block \
+            --bucket ${{ github.event.inputs.bucket_name }} \
+            --public-access-block-configuration \
+              BlockPublicAcls=true,\
+              IgnorePublicAcls=true,\
+              BlockPublicPolicy=true,\
+              RestrictPublicBuckets=true
+          echo "✅ Public access blocked"
+      
+      - name: Add Lifecycle Policy
+        run: |
+          echo "♻️  Configuring lifecycle policy..."
+          aws s3api put-bucket-lifecycle-configuration \
+            --bucket ${{ github.event.inputs.bucket_name }} \
+            --lifecycle-configuration '{
+              "Rules": [{
+                "Id": "DeleteOldVersions",
+                "Status": "Enabled",
+                "NoncurrentVersionExpiration": {
+                  "NoncurrentDays": 90
+                }
+              }]
+            }'
+          echo "✅ Lifecycle policy configured"
+      
+      - name: Add Tags
+        run: |
+          echo "🏷️  Adding tags..."
+          aws s3api put-bucket-tagging \
+            --bucket ${{ github.event.inputs.bucket_name }} \
+            --tagging 'TagSet=[
+              {Key=Project,Value=DevOps-Showcase},
+              {Key=Purpose,Value=Terraform-State},
+              {Key=ManagedBy,Value=GitHub-Actions}
+            ]'
+          echo "✅ Tags added"
+      
+      - name: Update Terraform Backend Configuration
+        run: |
+          echo "📝 Updating Terraform backend configuration..."
+          
+          cat > terraform/backend.tf <<EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ github.event.inputs.bucket_name }}"
+              key            = "terraform.tfstate"
+              region         = "${{ env.AWS_REGION }}"
+              encrypt        = true
+            }
+          }
+          EOF
+          
+          echo "✅ Backend configuration created at terraform/backend.tf"
+          echo ""
+          echo "Please commit this file to your repository:"
+          echo "  git add terraform/backend.tf"
+          echo "  git commit -m 'Add Terraform S3 backend configuration'"
+          echo "  git push"
+      
+      - name: Verify Bucket Configuration
+        run: |
+          echo "🔍 Verifying bucket configuration..."
+          
+          echo "Versioning Status:"
+          aws s3api get-bucket-versioning --bucket ${{ github.event.inputs.bucket_name }}
+          
+          echo ""
+          echo "Encryption Status:"
+          aws s3api get-bucket-encryption --bucket ${{ github.event.inputs.bucket_name }}
+          
+          echo ""
+          echo "Public Access Block:"
+          aws s3api get-public-access-block --bucket ${{ github.event.inputs.bucket_name }}
+          
+          echo "✅ Bucket configuration verified"
+      
+      - name: Bootstrap Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              Bootstrap Successful! 🎉                      ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "S3 Bucket: ${{ github.event.inputs.bucket_name }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          echo "✅ Versioning: Enabled"
+          echo "✅ Encryption: AES256"
+          echo "✅ Public Access: Blocked"
+          echo "✅ Lifecycle Policy: Configured (90 days)"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "   1. Commit the generated terraform/backend.tf file"
+          echo "   2. Update terraform/providers.tf with backend configuration"
+          echo "   3. Run 'Terraform Infrastructure Management' workflow"
+          echo ""
+          echo "Backend Configuration:"
+          echo "───────────────────────────────────────────────────────────"
+          echo "terraform {"
+          echo "  backend \"s3\" {"
+          echo "    bucket  = \"${{ github.event.inputs.bucket_name }}\""
+          echo "    key     = \"terraform.tfstate\""
+          echo "    region  = \"${{ env.AWS_REGION }}\""
+          echo "    encrypt = true"
+          echo "  }"
+          echo "}"
+          echo "───────────────────────────────────────────────────────────"
+          echo ""

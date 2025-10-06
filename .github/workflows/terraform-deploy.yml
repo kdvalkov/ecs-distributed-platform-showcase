@@ -1,0 +1,208 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: 'plan'
+      
+      confirm_apply:
+        description: 'Type "yes" to confirm APPLY operation'
+        required: false
+        type: string
+        default: ''
+      
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'dev'
+
+env:
+  TF_VERSION: '1.12.2'
+  AWS_REGION: 'eu-central-1'
+  WORKING_DIR: './terraform'
+
+jobs:
+  validate-inputs:
+    name: Validate Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    
+    steps:
+      - name: Validate Apply Confirmation
+        if: github.event.inputs.action == 'apply'
+        run: |
+          if [ "${{ github.event.inputs.confirm_apply }}" != "yes" ]; then
+            echo "❌ ERROR: Apply operation requires confirmation"
+            echo "Please type 'yes' in the confirm_apply field"
+            exit 1
+          fi
+          echo "✅ Apply confirmation validated"
+      
+      - name: Set Proceed Flag
+        id: check
+        run: echo "proceed=true" >> $GITHUB_OUTPUT
+
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Verify AWS Connection
+        run: |
+          echo "🔍 Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials verified"
+      
+      - name: Select Environment Configuration
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "✅ Using configuration: environments/${{ github.event.inputs.environment }}.tfvars"
+          echo "📋 Environment configuration:"
+          cat environments/${{ github.event.inputs.environment }}.tfvars
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          terraform init -input=false
+          echo "✅ Terraform initialized"
+      
+      - name: Terraform Validate
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "🔍 Validating Terraform configuration..."
+          terraform validate
+          echo "✅ Configuration is valid"
+      
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "📋 Creating deployment plan for ${{ github.event.inputs.environment }} environment..."
+          terraform plan -var-file="environments/${{ github.event.inputs.environment }}.tfvars" -out=tfplan -input=false
+          echo "✅ Plan created successfully"
+      
+      - name: Save Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ github.event.inputs.environment }}-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}/tfplan
+          retention-days: 7
+      
+      - name: Plan Summary
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              Terraform Plan Summary                        ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Action: ${{ github.event.inputs.action }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          terraform show tfplan
+          echo ""
+          echo "✅ Plan completed successfully"
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.event.inputs.action == 'apply'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init -input=false
+      
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-${{ github.event.inputs.environment }}-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}
+      
+      - name: Terraform Apply
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "🚀 Applying Terraform configuration..."
+          echo "⏱️  This may take 15-20 minutes..."
+          terraform apply -input=false tfplan
+          echo "✅ Infrastructure deployed successfully!"
+      
+      - name: Get Outputs
+        id: outputs
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "📋 Infrastructure Outputs:"
+          terraform output -json > outputs.json
+          cat outputs.json
+          
+          # Extract key outputs
+          ALB_DNS=$(terraform output -raw alb_dns_name || echo "N/A")
+          ECR_URL=$(terraform output -raw ecr_repository_url || echo "N/A")
+          
+          echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+          echo "ecr_url=$ECR_URL" >> $GITHUB_OUTPUT
+      
+      - name: Deployment Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║              Deployment Successful! 🎉                     ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo ""
+          echo "🌐 Application URL: http://${{ steps.outputs.outputs.alb_dns }}"
+          echo "📦 ECR Repository: ${{ steps.outputs.outputs.ecr_url }}"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "   1. Build and push Docker image to ECR"
+          echo "   2. Run the 'Deploy Application' workflow"
+          echo "   3. Visit the application URL in your browser"
+          echo ""
