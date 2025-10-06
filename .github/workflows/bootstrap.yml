@@ -124,11 +124,7 @@ jobs:
           echo "🔒 Blocking public access..."
           aws s3api put-public-access-block \
             --bucket ${{ github.event.inputs.bucket_name }} \
-            --public-access-block-configuration \
-              BlockPublicAcls=true,\
-              IgnorePublicAcls=true,\
-              BlockPublicPolicy=true,\
-              RestrictPublicBuckets=true
+            --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
           echo "✅ Public access blocked"
       
       - name: Add Lifecycle Policy
@@ -152,11 +148,7 @@ jobs:
           echo "🏷️  Adding tags..."
           aws s3api put-bucket-tagging \
             --bucket ${{ github.event.inputs.bucket_name }} \
-            --tagging 'TagSet=[
-              {Key=Project,Value=DevOps-Showcase},
-              {Key=Purpose,Value=Terraform-State},
-              {Key=ManagedBy,Value=GitHub-Actions}
-            ]'
+            --tagging 'TagSet=[{Key=Project,Value=DevOps-Showcase},{Key=Purpose,Value=Terraform-State},{Key=ManagedBy,Value=GitHub-Actions}]'
           echo "✅ Tags added"
       
       - name: Update Terraform Backend Configuration
