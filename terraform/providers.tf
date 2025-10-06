@@ -16,12 +16,13 @@ terraform {
   # Run scripts/bootstrap-backend.sh first to create the S3 bucket
   # Then uncomment this block and run: terraform init -reconfigure
   #
-  # backend "s3" {
-  #   bucket  = "devops-showcase-dev-tfstate-<YOUR-ACCOUNT-ID>"
-  #   key     = "terraform.tfstate"
-  #   region  = "eu-central-1"
-  #   encrypt = true
-  # }
+  backend "s3" {
+    bucket       = "devops-showcase-terraform-state"
+    key          = "terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
