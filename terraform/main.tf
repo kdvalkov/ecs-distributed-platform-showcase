@@ -411,6 +411,7 @@ module "ecs_service" {
 
   # Task Definition
   requires_compatibilities = ["EC2"]
+  network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
   memory                   = var.ecs_task_memory
 
@@ -440,6 +441,7 @@ module "ecs_service" {
         {
           name          = "app"
           containerPort = var.container_port
+          hostPort      = var.container_port
           protocol      = "tcp"
         }
       ]
