@@ -57,7 +57,7 @@ module "fck-nat" {
 
   name      = "${local.name_prefix}-fck-nat"
   vpc_id    = module.vpc.vpc_id
-  subnet_id = module.vpc.public_subnets[1]
+  subnet_id = module.vpc.public_subnets[2]
 
   # ha_mode              = true                 # Enables high-availability mode
   # eip_allocation_ids   = ["eipalloc-abc1234"] # Allocation ID of an existing EIP
