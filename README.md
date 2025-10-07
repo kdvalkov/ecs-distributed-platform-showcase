@@ -12,6 +12,7 @@ This project implements a production-ready infrastructure on AWS with:
 - **Route53 & ACM** - DNS management and SSL/TLS certificates
 - **ECR** - Private Docker registry for container images
 - **VPC** - Multi-AZ network architecture with public and private subnets
+- **fck-nat** - Cost-effective NAT solution (saves ~$29/month vs AWS NAT Gateway)
 - **CloudWatch** - Logging and monitoring with Container Insights
 
 ```
@@ -53,6 +54,7 @@ This project implements a production-ready infrastructure on AWS with:
 - ✅ **Auto-scaling** based on CPU and memory utilization
 - ✅ **Health checks** with automatic instance replacement
 - ✅ **Zero-downtime deployments** with rolling updates
+- ✅ **Cost-optimized NAT** using [fck-nat](https://github.com/AndrewGuenther/fck-nat) (~90% cheaper than NAT Gateway)
 - ✅ **Infrastructure as Code** using Terraform with community modules
 - ✅ **CI/CD pipeline** with GitHub Actions
 
@@ -327,15 +329,19 @@ Approximate monthly costs (eu-central-1):
 | ECS EC2 (2× t3.small) | On-Demand | ~$30 |
 | RDS (db.t3.micro Multi-AZ) | On-Demand | ~$30 |
 | Application Load Balancer | Standard | ~$20 |
-| NAT Gateway (Single) | Standard | ~$32 |
+| fck-nat Instance (t4g.micro) | Spot pricing | ~$2-3 |
 | Data Transfer | 10 GB/month | ~$1 |
-| **Total** | | **~$113/month** |
+| **Total** | | **~$83-84/month** |
 
 ### Cost Optimization Tips
 
 **Current Configuration:**
-- ✅ Single NAT Gateway enabled (saves ~$32/month vs Multi-AZ NAT)
-- ⚠️ Note: Single NAT Gateway means no NAT redundancy across AZs (acceptable for dev/staging)
+- ✅ **fck-nat** instead of NAT Gateway (saves **~$29/month** vs single NAT Gateway, **~$61/month** vs Multi-AZ NAT!)
+  - Uses [terraform-aws-fck-nat](https://github.com/RaJiska/terraform-aws-fck-nat) module
+  - Runs on t4g.micro spot instance (~$2-3/month vs $32/month NAT Gateway)
+  - Provides same functionality as AWS NAT Gateway at fraction of cost
+  - Perfect for dev/test environments
+- ⚠️ Note: Single-AZ fck-nat deployment means no NAT redundancy across AZs (acceptable for dev/staging)
 
 **Additional Optimizations:**
 
@@ -345,9 +351,42 @@ Approximate monthly costs (eu-central-1):
    ```
    Saves ~$15/month
 
-3. **Use AWS Free Tier** (first 12 months):
+2. **Use AWS Free Tier** (first 12 months):
    - 750 hours/month t2.micro RDS
    - 750 hours/month t2.micro EC2
+
+### Why fck-nat?
+
+This project uses **[fck-nat](https://github.com/AndrewGuenther/fck-nat)** instead of AWS NAT Gateway for massive cost savings:
+
+**Cost Comparison:**
+- AWS NAT Gateway (Single-AZ): **$32/month** + data processing fees
+- AWS NAT Gateway (Multi-AZ): **$64/month** + data processing fees
+- fck-nat (t4g.micro spot): **$2-3/month** (no data processing fees!)
+
+**Benefits:**
+- ✅ **90%+ cost reduction** compared to AWS NAT Gateway
+- ✅ **Same functionality** - routes private subnet traffic to internet
+- ✅ **ARM-based** (t4g.micro) for better price/performance
+- ✅ **Spot instances** for additional savings
+- ✅ **Battle-tested** - widely used in production environments
+- ✅ **Easy management** via [terraform-aws-fck-nat](https://github.com/RaJiska/terraform-aws-fck-nat) module
+
+**Implementation:**
+```hcl
+module "fck-nat" {
+  source = "git::https://github.com/RaJiska/terraform-aws-fck-nat.git"
+  
+  name      = "${local.name_prefix}-fck-nat"
+  vpc_id    = module.vpc.vpc_id
+  subnet_id = module.vpc.public_subnets[0]
+  
+  update_route_tables = true
+  route_tables_ids    = local.all_route_tables  # Private + Database subnets
+}
+```
+
+**Perfect for:** Development, staging, and cost-sensitive production environments.
 
 ## 🧹 Cleanup
 

@@ -11,7 +11,7 @@ This document provides a detailed technical explanation of the infrastructure ar
 ```
 VPC (10.0.0.0/16)
 ├── Availability Zone A (eu-central-1a)
-│   ├── Public Subnet (10.0.2.0/20)      → ALB, NAT Gateway
+│   ├── Public Subnet (10.0.2.0/20)      → ALB, fck-nat Instance
 │   ├── Private Subnet (10.0.18.0/20)    → ECS Tasks
 │   └── Database Subnet (10.0.34.0/20)   → RDS Primary
 │
@@ -23,7 +23,7 @@ VPC (10.0.0.0/16)
 
 ### Subnet Strategy
 
-- **Public Subnets**: Internet-facing resources (ALB, NAT Gateway)
+- **Public Subnets**: Internet-facing resources (ALB, fck-nat Instance)
 - **Private Subnets**: Application layer (ECS tasks on EC2)
 - **Database Subnets**: Data layer (RDS instances, isolated)
 
@@ -41,8 +41,10 @@ VPC (10.0.0.0/16)
 
 2. **Outbound Traffic**:
    ```
-   ECS Tasks → NAT Gateway (Public Subnet) → Internet Gateway → Internet
+   ECS Tasks → fck-nat Instance (Public Subnet) → Internet Gateway → Internet
    ```
+   
+   *Note: Uses [fck-nat](https://github.com/AndrewGuenther/fck-nat) via [terraform-aws-fck-nat](https://github.com/RaJiska/terraform-aws-fck-nat) module for cost-effective NAT functionality*
 
 ## DNS and SSL/TLS Architecture
 
@@ -517,17 +519,20 @@ Rolling Update (as described above)
 | 2× t3.small EC2 | ~$30 |
 | ALB | ~$20 |
 | RDS db.t3.micro Multi-AZ | ~$30 |
-| 1× NAT Gateway | ~$32 |
+| fck-nat (t4g.micro spot) | ~$2-3 |
 | Route53 Hosted Zone | ~$0.50 |
 | Route53 Queries (1M) | ~$0.40 |
 | ACM Certificate | **FREE** |
 | Data Transfer (10GB) | ~$1 |
-| **Total** | **~$114** |
+| **Total** | **~$84-85** |
 
 ### Optimization Options
 
 1. **Development Environment**:
-   - ✅ Already using Single NAT Gateway (configured)
+   - ✅ **Already using fck-nat** (saves ~$29/month vs NAT Gateway!)
+     - Uses [terraform-aws-fck-nat](https://github.com/RaJiska/terraform-aws-fck-nat) module
+     - Runs on ARM-based t4g.micro spot instance
+     - Provides NAT functionality at fraction of AWS NAT Gateway cost
    - RDS Single-AZ: Save $15/month
    - Smaller instances: Variable savings
 

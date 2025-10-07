@@ -217,14 +217,14 @@ terraform plan -out=tfplan
 
 **Key Resources to Verify in Plan**:
 - ✅ VPC with 6 subnets (2 public, 2 private, 2 database)
-- ✅ 1 NAT Gateway (single AZ for cost savings)
+- ✅ 1 fck-nat Instance (t4g.micro spot for cost savings)
 - ✅ Application Load Balancer
 - ✅ ECS Cluster with capacity provider
 - ✅ Auto Scaling Group (2 instances)
 - ✅ RDS PostgreSQL (Multi-AZ)
 - ✅ ECR Repository
-- ✅ Security Groups (ALB, ECS, RDS)
-- ✅ IAM Roles (task execution, task, instance)
+- ✅ Security Groups (ALB, ECS, RDS, fck-nat)
+- ✅ IAM Roles (task execution, task, instance, fck-nat)
 - ✅ CloudWatch Log Group
 
 #### 3.4 Apply Configuration
@@ -238,7 +238,7 @@ terraform apply tfplan
 ```
 
 **Progress Indicators**:
-- 0-5 min: Network resources (VPC, subnets, IGW, NAT)
+- 0-5 min: Network resources (VPC, subnets, IGW, fck-nat)
 - 5-10 min: RDS instance creation (slowest component)
 - 10-15 min: ECS cluster, EC2 instances launching
 - 15-20 min: Load balancer, target groups, final configurations
