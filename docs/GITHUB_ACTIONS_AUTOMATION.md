@@ -140,54 +140,60 @@ terraform {
 
 **File:** `.github/workflows/terraform-deploy.yml`
 
-**Purpose:** Deploy and update infrastructure with Terraform (plan and apply operations).
+**Purpose:** Deploy and update infrastructure with Terraform using a **two-step approval process**.
 
 **When to Run:** 
 - After bootstrap (for first deployment)
 - Whenever you want to deploy or update infrastructure
-- To preview changes before applying
+- Automatically generates plan for review before applying
+
+**🔒 Manual Approval Feature:**
+This workflow includes a manual approval step between plan and apply. An engineer must review and approve the plan before infrastructure changes are applied. See [MANUAL_APPROVAL_SETUP.md](MANUAL_APPROVAL_SETUP.md) for setup instructions.
 
 #### Usage
 
 1. Go to GitHub → Actions → "Deploy Infrastructure"
 2. Click "Run workflow"
-3. Configure inputs:
-   - **Terraform Action:**
-     - `plan` - Preview changes (safe, no modifications)
-     - `apply` - Deploy infrastructure (creates resources)
-   - **Environment:** Choose `dev`, `staging`, or `prod`
-   - **Confirmation:**
-     - For `apply`: Type `yes`
+3. Select **Environment:** Choose `dev`, `staging`, or `prod`
 4. Click "Run workflow"
+5. **Wait for Plan:** Workflow automatically runs Terraform Plan (~5 min)
+6. **Review Plan:** Check the output in the "Terraform Plan" job logs
+7. **Approve:** Click "Review deployments" → Select environment → "Approve and deploy"
+8. **Apply Runs:** After approval, Terraform Apply executes (~20 min)
 
-#### Actions Explained
+#### Workflow Stages
 
-##### Plan (Safe Preview)
+The workflow has two jobs that run in sequence:
+
 ```
-Action: plan
-Confirmation: Not required
+1. terraform-plan (Automatic)
+   └─> Runs Terraform Plan
+   └─> Shows all infrastructure changes
+   └─> Uploads plan artifact
+   └─> Duration: ~5 minutes
+
+2. manual-approval (Manual Review Required)
+   └─> ⏸️  Pauses and waits for engineer approval
+   └─> 👤 Engineer reviews plan output
+   └─> ✅ Engineer clicks "Approve and deploy"
+   └─> Runs Terraform Apply with saved plan
+   └─> Duration: ~20 minutes
 ```
 
-- Shows what Terraform will create/modify/destroy
-- No actual changes made
-- Use this to review changes before applying
-- Duration: ~2-3 minutes
+#### What Gets Created
 
-##### Apply (Deploy Infrastructure)
-```
-Action: apply
-Confirmation: Type "yes"
-```
-
-- Creates all AWS resources:
-  - VPC with public/private subnets
-  - Application Load Balancer
-  - ECS cluster and service
-  - RDS PostgreSQL database
-  - ECR repository
-  - Security groups and IAM roles
-- Takes 15-20 minutes
-- Outputs ALB DNS name and other resource details
+When you approve and apply, the following AWS resources are created:
+- VPC with public/private/database subnets (Multi-AZ)
+- fck-nat Instance (cost-effective NAT solution)
+- Application Load Balancer (Multi-AZ)
+- ECS cluster with Auto Scaling Group
+- ECS service with task definition
+- RDS PostgreSQL database (Multi-AZ)
+- ECR repository for Docker images
+- Security groups and IAM roles
+- CloudWatch Log Groups
+- Route53 DNS records (if domain configured)
+- ACM SSL certificate (if domain configured)
 
 #### Workflow Stages
 

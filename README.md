@@ -206,18 +206,27 @@ Builds and pushes Docker image automatically:
 4. Wait 5-60 minutes for DNS propagation ✅
 ```
 
-#### Step 4: Deploy Infrastructure
+#### Step 4: Configure Manual Approval (Optional but Recommended)
 ```
-1. Actions → "Deploy Infrastructure" → Run workflow
-2. Select:
-   - Action: apply
-   - Environment: dev
-   - Confirm Apply: yes
-3. Wait ~20 minutes ✅
-4. Certificate will be automatically validated via DNS
+1. Go to Settings → Environments → New environment
+2. Create environment: "dev"
+3. Enable "Required reviewers" and add your GitHub username
+4. This adds manual approval before infrastructure changes are applied
+5. See docs/MANUAL_APPROVAL_SETUP.md for detailed setup
 ```
 
-#### Step 5: Deploy Application
+#### Step 5: Deploy Infrastructure
+```
+1. Actions → "Deploy Infrastructure" → Run workflow
+2. Select Environment: dev
+3. Workflow runs Terraform Plan automatically (~5 min)
+4. Review the plan output in the logs
+5. Click "Review deployments" → "Approve and deploy" to proceed
+6. Terraform Apply runs (~20 minutes) ✅
+7. Certificate will be automatically validated via DNS
+```
+
+#### Step 6: Deploy Application
 ```
 1. Actions → "Deploy Application" → Run workflow
    (or just push to main branch)
@@ -264,12 +273,14 @@ See **[GITHUB_ACTIONS_AUTOMATION.md](docs/GITHUB_ACTIONS_AUTOMATION.md)** for:
 ### ✅ Safety Features
 
 All workflows include multiple safety features:
-- ✅ **Input Validation** - Type confirmations required
-- ✅ **Plan Before Apply** - Review changes first
-- ✅ **Multiple Confirmations** - Especially for destroy
+- ✅ **Manual Approval** - Engineer reviews plan before apply (see [MANUAL_APPROVAL_SETUP.md](docs/MANUAL_APPROVAL_SETUP.md))
+- ✅ **Plan Before Apply** - Always review changes first
+- ✅ **Two-Step Deployment** - Plan runs automatically, Apply requires approval
+- ✅ **Multiple Confirmations** - Especially for destroy operations
 - ✅ **10-Second Countdown** - Before destructive operations
 - ✅ **Detailed Logs** - Full visibility into operations
 - ✅ **State Locking** - Prevent concurrent modifications
+- ✅ **Audit Trail** - GitHub records who approved each deployment
 
 ## 🧪 Testing Fail-Over Scenarios
 
