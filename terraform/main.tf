@@ -2,6 +2,20 @@
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
 
+  # All route tables that need NAT routing
+  nat_route_tables = merge(
+    # Private subnet route tables
+    {
+      for idx, rt_id in module.vpc.private_route_table_ids :
+      "private-${module.vpc.azs[idx]}" => rt_id
+    },
+    # Database subnet route tables
+    {
+      for idx, rt_id in module.vpc.database_route_table_ids :
+      "database-${module.vpc.azs[idx]}" => rt_id
+    }
+  )
+
   tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -26,12 +40,31 @@ module "vpc" {
 
   create_database_subnet_group = true
 
-  enable_nat_gateway   = true
-  single_nat_gateway   = true # Single-AZ NAT for lower costs
+  enable_nat_gateway   = false # We use our own NAT instance
+  single_nat_gateway   = true  # Single-AZ NAT for lower costs
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   tags = local.tags
+}
+
+################################################################################
+# VPC Module - Using community module
+################################################################################
+
+module "fck-nat" {
+  source = "git::https://github.com/RaJiska/terraform-aws-fck-nat.git"
+
+  name      = "${local.name_prefix}-fck-nat"
+  vpc_id    = module.vpc.vpc_id
+  subnet_id = module.vpc.public_subnets[0]
+
+  # ha_mode              = true                 # Enables high-availability mode
+  # eip_allocation_ids   = ["eipalloc-abc1234"] # Allocation ID of an existing EIP
+  # use_cloudwatch_agent = true                 # Enables Cloudwatch agent and have metrics reported
+
+  update_route_tables = true
+  route_tables_ids    = local.nat_route_tables
 }
 
 ################################################################################
