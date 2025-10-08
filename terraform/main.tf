@@ -520,12 +520,12 @@ module "ecs_service" {
         }
       ]
 
-      health_check = {
+      healthCheck = {
         command     = ["CMD-SHELL", "node -e \"require('http').get('http://localhost:${var.container_port}/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})\""]
         interval    = 30
         timeout     = 5
         retries     = 3
-        startPeriod = 60
+        startPeriod = 5
       }
 
       # CloudWatch logs
