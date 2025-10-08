@@ -17,7 +17,7 @@ This project implements a production-ready infrastructure on AWS with:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Internet                             │
+│                         Internet                            │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
