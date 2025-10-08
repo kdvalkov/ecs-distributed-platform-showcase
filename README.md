@@ -64,6 +64,7 @@ This project implements a production-ready infrastructure on AWS with:
 - 🏥 **Health check endpoints** for load balancer
 - 🐳 **Container metadata** display (hostname, resources, uptime)
 - 🌍 **AWS metadata** (region, AZ, ECS task info)
+- 💣 **Self-destruct killswitch** for demonstrating automatic failover (see [KILLSWITCH_FEATURE.md](docs/KILLSWITCH_FEATURE.md))
 
 ## 📋 Prerequisites
 
@@ -288,14 +289,22 @@ See [FAILOVER_DEMO.md](./docs/FAILOVER_DEMO.md) for detailed fail-over testing p
 
 ### Quick Tests
 
-1. **Container Fail-Over**:
+1. **Container Fail-Over (Self-Destruct Button - Recommended)**:
+   - Open the application in your browser
+   - Scroll to the bottom and click the **"🔴 ACTIVATE SELF-DESTRUCT"** button
+   - Watch the countdown and observe automatic recovery
+   - Refresh the page to see the new container
+   
+   **Perfect for live demos!** No CLI commands needed.
+
+2. **Container Fail-Over (CLI Method)**:
    ```bash
    # Stop a running task
    aws ecs stop-task --cluster devops-showcase-dev-cluster --task <task-id>
    ```
    Watch ECS automatically start a replacement task.
 
-2. **Auto-Scaling**:
+3. **Auto-Scaling**:
    ```bash
    # Generate load with Apache Bench
    ab -n 10000 -c 100 https://showcase.valkov.cloud/
@@ -498,7 +507,19 @@ This is a showcase project for learning purposes. Feel free to fork and customiz
 
 MIT License - feel free to use this for learning and demonstration purposes.
 
-## 📚 Additional Resources
+## � Self-Destruct Killswitch Feature
+
+NEW! The application now includes an interactive **self-destruct button** perfect for demonstrating infrastructure resilience:
+
+- 🔴 **One-Click Failover Demo** - No CLI commands needed
+- ⏱️ **5-Second Countdown** - Visual and dramatic for presentations
+- 🔄 **Automatic Recovery** - ECS launches replacement within 10-30 seconds
+- 📊 **Zero Downtime** - ALB routes traffic to healthy tasks
+- 🎯 **Perfect for Demos** - Impresses technical and non-technical audiences
+
+**See full documentation:** [KILLSWITCH_FEATURE.md](docs/KILLSWITCH_FEATURE.md)
+
+## �📚 Additional Resources
 
 - [Terraform AWS Modules](https://registry.terraform.io/namespaces/terraform-aws-modules)
 - [AWS ECS Best Practices](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/intro.html)

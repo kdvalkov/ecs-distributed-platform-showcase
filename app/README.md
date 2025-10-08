@@ -20,6 +20,7 @@ A Node.js Express application designed to demonstrate AWS infrastructure capabil
   - Displays comprehensive infrastructure information
   - Shows real-time container and database status
   - Increments request counter in database
+  - Includes self-destruct button for failover demonstrations
 
 - `GET /api/info` - JSON API endpoint
   - Returns all infrastructure data in JSON format
@@ -36,6 +37,37 @@ A Node.js Express application designed to demonstrate AWS infrastructure capabil
   - Simple check that application is running
   - Always returns 200 if server is responding
 
+### Infrastructure Demo Endpoints
+
+- `POST /api/killswitch` - Self-destruct endpoint
+  - Gracefully terminates the current container
+  - Demonstrates automatic failover and recovery
+  - Requires JSON body: `{"confirm": true}`
+  - Protected by basic authentication (if configured)
+  - Container terminates after 5 seconds
+  - ECS automatically starts a new task
+  - Perfect for demonstrating infrastructure resilience
+  
+  **Example:**
+  ```bash
+  curl -X POST https://your-app-url/api/killswitch \
+    -u admin:changeme \
+    -H "Content-Type: application/json" \
+    -d '{"confirm": true}'
+  ```
+  
+  **Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Self-destruct sequence activated",
+    "hostname": "ip-10-0-1-123",
+    "taskArn": "arn:aws:ecs:eu-central-1:...",
+    "terminationTime": "2025-10-08T12:34:56.789Z",
+    "info": "This container will terminate in 5 seconds. ECS will automatically start a new task."
+  }
+  ```
+
 ## Environment Variables
 
 Required:
@@ -50,6 +82,8 @@ Optional:
 - `NODE_ENV` - Environment (production/development)
 - `AWS_REGION` - AWS region for metadata
 - `AWS_AVAILABILITY_ZONE` - Current availability zone
+- `BASIC_AUTH_USER` - Basic auth username (default: admin)
+- `BASIC_AUTH_PASSWORD` - Basic auth password (default: changeme)
 
 ## Local Development
 

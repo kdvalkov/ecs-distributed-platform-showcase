@@ -7,6 +7,9 @@ const basicAuth = require('express-basic-auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable JSON body parsing for POST requests
+app.use(express.json());
+
 // Application start time for uptime calculation
 const startTime = Date.now();
 
@@ -75,7 +78,7 @@ async function initDatabase() {
 }
 
 // Get container/instance metadata
-function getInstanceInfo() {
+async function getInstanceInfo() {
   const hostname = os.hostname();
   const platform = os.platform();
   const arch = os.arch();
@@ -83,18 +86,51 @@ function getInstanceInfo() {
   const totalMemory = (os.totalmem() / (1024 ** 3)).toFixed(2);
   const freeMemory = (os.freemem() / (1024 ** 3)).toFixed(2);
   
-  // Try to get ECS metadata
+  // Try to get ECS metadata from the metadata endpoint
   let ecsMetadata = null;
   try {
     const metadataUri = process.env.ECS_CONTAINER_METADATA_URI_V4;
     if (metadataUri) {
+      // Fetch metadata from the endpoint
+      const http = require('http');
+      const taskMetadata = await new Promise((resolve, reject) => {
+        http.get(`${metadataUri}/task`, (res) => {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }).on('error', reject);
+      });
+      
+      const containerMetadata = await new Promise((resolve, reject) => {
+        http.get(metadataUri, (res) => {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }).on('error', reject);
+      });
+      
       ecsMetadata = {
-        taskArn: process.env.ECS_TASK_ARN || 'Not available',
-        containerName: process.env.ECS_CONTAINER_NAME || 'Not available',
+        taskArn: taskMetadata.TaskARN || 'Not available',
+        containerName: containerMetadata.Name || 'Not available',
+        containerImage: containerMetadata.Image || 'Not available',
+        containerImageID: containerMetadata.ImageID ? containerMetadata.ImageID.substring(0, 12) : 'Not available',
       };
     }
   } catch (error) {
-    // ECS metadata not available (local dev)
+    // ECS metadata not available (local dev) or error fetching
+    console.log('ECS metadata fetch failed:', error.message);
   }
   
   return {
@@ -178,7 +214,7 @@ app.get('/ready', (req, res) => {
 
 // Main dashboard endpoint
 app.get('/', async (req, res) => {
-  const instanceInfo = getInstanceInfo();
+  const instanceInfo = await getInstanceInfo();
   const dbStatus = await checkDatabase();
   const requestCount = await incrementCounter();
   const uptime = getUptime();
@@ -289,6 +325,80 @@ app.get('/', async (req, res) => {
             margin: 10px 0;
             border-left: 4px solid #667eea;
         }
+        .killswitch-section {
+            margin-top: 30px;
+        }
+        .killswitch-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .killswitch-btn:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+        }
+        .killswitch-btn:active {
+            transform: translateY(0);
+        }
+        .killswitch-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .warning-box h3 {
+            color: #d97706;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .warning-box p {
+            color: #92400e;
+            line-height: 1.6;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+            font-weight: 600;
+        }
+        .status-message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        .status-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+        .countdown {
+            font-size: 2em;
+            text-align: center;
+            color: #ef4444;
+            font-weight: bold;
+            margin: 20px 0;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -348,6 +458,14 @@ app.get('/', async (req, res) => {
                     <div class="info-row" style="margin-top: 10px;">
                         <span class="label">Container Name:</span>
                         <span class="value">${instanceInfo.ecsMetadata.containerName}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Container Image:</span>
+                        <span class="value">${instanceInfo.ecsMetadata.containerImage.split('/').pop()}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Image ID:</span>
+                        <span class="value">${instanceInfo.ecsMetadata.containerImageID}</span>
                     </div>
                 </div>
                 ` : '<p style="color: #999; text-align: center; margin-top: 20px;">Running in local development mode</p>'}
@@ -415,10 +533,99 @@ app.get('/', async (req, res) => {
             </div>
         </div>
         
+        <div class="card killswitch-section">
+            <h2>💣 Infrastructure Demo: Self-Destruct</h2>
+            <div class="warning-box">
+                <h3>⚠️ Warning</h3>
+                <p>
+                    This killswitch demonstrates the infrastructure's <strong>automatic failover and recovery</strong> capabilities. 
+                    When triggered, this container will gracefully terminate, and ECS will automatically start a new healthy task.
+                </p>
+                <p style="margin-top: 10px;">
+                    <strong>What happens:</strong>
+                    <br>• Current task receives SIGTERM signal
+                    <br>• ECS marks this task as unhealthy
+                    <br>• A new task is automatically launched
+                    <br>• Load balancer redirects traffic to healthy tasks
+                    <br>• Total downtime: ~10-30 seconds
+                </p>
+            </div>
+            
+            <div id="countdown" class="countdown"></div>
+            
+            <button id="killswitch" class="killswitch-btn" onclick="triggerKillswitch()">
+                🔴 ACTIVATE SELF-DESTRUCT
+            </button>
+            
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+        
         <div class="timestamp">
             Generated at: ${new Date().toISOString()} | Refresh to test load balancing
         </div>
     </div>
+    
+    <script>
+        function triggerKillswitch() {
+            const btn = document.getElementById('killswitch');
+            const statusMsg = document.getElementById('statusMessage');
+            const countdownDiv = document.getElementById('countdown');
+            
+            // Confirm action
+            const confirmed = confirm(
+                '⚠️ Are you sure you want to activate the self-destruct?\\n\\n' +
+                'This will terminate the current container and trigger automatic failover.\\n' +
+                'A new container will be started automatically by ECS.'
+            );
+            
+            if (!confirmed) return;
+            
+            // Disable button
+            btn.disabled = true;
+            btn.textContent = '⏳ Initiating self-destruct...';
+            
+            // Show status message
+            statusMsg.style.display = 'block';
+            statusMsg.className = 'status-message success';
+            statusMsg.textContent = '🚀 Self-destruct sequence initiated! This container will terminate in 5 seconds...';
+            
+            // Show countdown
+            countdownDiv.style.display = 'block';
+            let count = 5;
+            countdownDiv.textContent = count;
+            
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownDiv.textContent = count;
+                } else {
+                    countdownDiv.textContent = '💥';
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // Call the killswitch endpoint
+            fetch('/api/killswitch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ confirm: true })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Killswitch response:', data);
+            })
+            .catch(error => {
+                console.error('Error triggering killswitch:', error);
+                statusMsg.className = 'status-message error';
+                statusMsg.textContent = '❌ Failed to trigger killswitch: ' + error.message;
+                btn.disabled = false;
+                btn.textContent = '🔴 ACTIVATE SELF-DESTRUCT';
+                countdownDiv.style.display = 'none';
+            });
+        }
+    </script>
 </body>
 </html>
   `;
@@ -428,7 +635,7 @@ app.get('/', async (req, res) => {
 
 // API endpoint for JSON response
 app.get('/api/info', async (req, res) => {
-  const instanceInfo = getInstanceInfo();
+  const instanceInfo = await getInstanceInfo();
   const dbStatus = await checkDatabase();
   const requestCount = await incrementCounter();
   const uptime = getUptime();
@@ -440,6 +647,46 @@ app.get('/api/info', async (req, res) => {
     uptime,
     timestamp: new Date().toISOString(),
   });
+});
+
+// Killswitch endpoint - gracefully terminates the container
+app.post('/api/killswitch', async (req, res) => {
+  const { confirm } = req.body;
+  
+  if (!confirm) {
+    return res.status(400).json({
+      success: false,
+      message: 'Confirmation required to trigger killswitch',
+    });
+  }
+  
+  const instanceInfo = await getInstanceInfo();
+  const hostname = instanceInfo.hostname;
+  const taskArn = instanceInfo.ecsMetadata?.taskArn || 'N/A';
+  
+  console.log('🔴 KILLSWITCH ACTIVATED! Self-destruct sequence initiated...');
+  console.log(`📦 Terminating container: ${hostname}`);
+  console.log(`🏷️  ECS Task ARN: ${taskArn}`);
+  
+  // Send response before terminating
+  res.json({
+    success: true,
+    message: 'Self-destruct sequence activated',
+    hostname,
+    taskArn,
+    terminationTime: new Date().toISOString(),
+    info: 'This container will terminate in 5 seconds. ECS will automatically start a new task.',
+  });
+  
+  // Close database connections
+  console.log('🔌 Closing database connections...');
+  await pool.end();
+  
+  // Gracefully terminate after a short delay
+  setTimeout(() => {
+    console.log('💥 Self-destruct completed! Container terminating now...');
+    process.exit(0);
+  }, 5000);
 });
 
 // Start server

@@ -15,6 +15,46 @@ This guide provides step-by-step procedures for demonstrating various fail-over 
 
 **Objective**: Demonstrate automatic container replacement when a task fails.
 
+#### Method 1: Self-Destruct Button (Recommended for Demos)
+
+The application includes a built-in **self-destruct button** that provides an easy and visual way to demonstrate failover.
+
+**Steps**:
+1. Open the application URL in your browser
+2. Scroll to the bottom of the page
+3. Locate the "Infrastructure Demo: Self-Destruct" section
+4. Click the **"🔴 ACTIVATE SELF-DESTRUCT"** button
+5. Confirm the action in the dialog box
+6. Watch the countdown (5 seconds)
+
+**What Happens**:
+- The current container gracefully terminates itself
+- ECS detects the task stopped
+- A new task is automatically launched within 10-30 seconds
+- The ALB continues routing traffic to healthy tasks
+- Refresh the page to see the new container hostname
+
+**Expected Behavior**:
+1. Current task terminates gracefully
+2. ECS service detects desired count not met
+3. New task automatically launched
+4. New task starts, passes health checks
+5. New task added to ALB target group
+6. Service maintains availability throughout
+
+**Timeline**: ~10-30 seconds for full recovery
+
+**Benefits of Self-Destruct Method**:
+- ✅ No AWS CLI commands needed
+- ✅ Perfect for live demonstrations
+- ✅ Visual countdown and feedback
+- ✅ Demonstrates graceful shutdown
+- ✅ Easy to explain to non-technical audiences
+
+---
+
+#### Method 2: Stop a Running Task (AWS CLI)
+
 #### Method 1: Stop a Running Task
 
 ```bash
